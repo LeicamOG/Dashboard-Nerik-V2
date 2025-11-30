@@ -1,0 +1,255 @@
+{
+  "name": "Dashboard Backend - WTS Full Loop Fix",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook/dashboard-data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8586d611-8a74-4cb8-bce7-294417a60cf3",
+      "name": "Webhook Dashboard V2",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -2032,
+        5776
+      ],
+      "webhookId": "c5d98823-e432-4285-a5d1-6451e97821ed"
+    },
+    {
+      "parameters": {
+        "url": "https://api.wts.chat/crm/v1/panel/5efab390-77c8-4298-907d-bcbd6811e840?IncludeDetails=Tags&IncludeDetails=Steps&IncludeDetails=StepsFields&IncludeDetails=StepsCardCount",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "pn_S4Nhr9ooaOVIMCa44L6jbthw8nrX9287yeSfSTcQ"
+            },
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3b4016db-2706-4715-8c02-e06f2b98fc8d",
+      "name": "Get Pipeline Structure V2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -1840,
+        5776
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GERADOR DE PÁGINAS\n// Defina um limite seguro. O loop vai tentar rodar todas.\nconst maxPages = 30; \nconst pages = [];\n\nfor (let i = 1; i <= maxPages; i++) {\n  pages.push({ json: { pageNumber: i } });\n}\n\nreturn pages;"
+      },
+      "id": "489e062d-46f1-4d33-bd51-e70f66a9eb22",
+      "name": "Generate Pages1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1632,
+        5776
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1424,
+        5776
+      ],
+      "id": "84b161b9-2ad4-49f9-8179-822f3f8f8a73",
+      "name": "Loop Over Pages V"
+    },
+    {
+      "parameters": {
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "PanelId",
+              "value": "5efab390-77c8-4298-907d-bcbd6811e840"
+            },
+            {
+              "name": "PageSize",
+              "value": "100"
+            },
+            {
+              "name": "PageNumber",
+              "value": "={{ $json.pageNumber }}"
+            },
+            {
+              "name": "IncludeArchived",
+              "value": "true"
+            },
+            {
+              "name": "IncludeDetails",
+              "value": "Contacts"
+            },
+            {
+              "name": "IncludeDetails",
+              "value": "CustomFields"
+            },
+            {
+              "name": "OrderDirection",
+              "value": "DESCENDING"
+            },
+            {
+              "name": "OrderBy",
+              "value": "createdAt"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "pn_S4Nhr9ooaOVIMCa44L6jbthw8nrX9287yeSfSTcQ"
+            },
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c3ada15a-b9a9-4955-a506-b64bda67fcb1",
+      "name": "Get Single Page V4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -1136,
+        5568
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// NOME EXATO do nó HTTP do Loop\nconst nodeName = 'Loop Over Pages V';\n// NOME EXATO do nó que pega a estrutura (Colunas/Tags)\nconst structureNodeName = 'Get Pipeline Structure V2';\n\nlet allItems = [];\nlet structureData = {};\n\ntry {\n  // 1. Tenta recuperar a estrutura do Pipeline (Steps e Tags) do nó anterior\n  // Como o 'Get Pipeline Structure V2' é um ancestral, podemos pegá-lo via $(\"...\").first()\n  const structureExec = $(structureNodeName).first();\n  if (structureExec && structureExec.json) {\n      structureData = structureExec.json;\n  }\n\n  // 2. Recupera todos os itens do Loop\n  const allExecutions = $(nodeName).all();\n  for (const execution of allExecutions) {\n    if (execution && execution.json && execution.json.items && Array.isArray(execution.json.items)) {\n        allItems.push(...execution.json.items);\n    }\n  }\n\n} catch (error) {\n  console.log('Erro ao ler histórico: ' + error.message);\n}\n\n// Retorna um objeto combinado: Estrutura (Steps) + Dados (Cards)\nreturn {\n  json: {\n    status: \"success\",\n    // Passa adiante os dados estruturais importantes\n    steps: structureData.steps || [],\n    tags: structureData.tags || [],\n    panelId: structureData.id,\n    title: structureData.title,\n    // Dados acumulados\n    total_records: allItems.length,\n    data: allItems\n  }\n};"
+      },
+      "id": "abb6140f-7313-4625-a808-0102916412cb",
+      "name": "Compile Final Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1184,
+        5936
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fd35db9c-05bd-40bf-8083-68ea03321d1e",
+      "name": "Respond Final1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        5936
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Dashboard V2": {
+      "main": [
+        [
+          {
+            "node": "Get Pipeline Structure V2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pipeline Structure V2": {
+      "main": [
+        [
+          {
+            "node": "Generate Pages1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Pages1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Pages V",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Pages V": {
+      "main": [
+        [
+          {
+            "node": "Compile Final Data1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Single Page V4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Single Page V4": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Pages V",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Final Data1": {
+      "main": [
+        [
+          {
+            "node": "Respond Final1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "add39c4053d358672f886bb77cfdad09fe5c8b5756da203aed0b847cf39a3a48"
+  }
+}
