@@ -3,7 +3,8 @@ import { DashboardData, PipelineStage, DateFilterState, TeamMember, ServiceData,
 // ============================================================================
 // CONFIGURAÇÃO DE INTEGRAÇÃO
 // ============================================================================
-const WTS_BASE_URL = 'https://swebhooks.conversapp.com.br/webhook/webhook/dashboard-data';
+// CORRECTED URL: Updated to new N8N instance
+const WTS_BASE_URL = 'https://workw.conversapp.app.br/webhook/06b098ce-6421-4edc-845b-a8786d62902c';
 
 // Ordem Fixa das Etapas conforme solicitado
 const FIXED_STAGE_ORDER = [
@@ -464,10 +465,12 @@ let globalTagMap = new Map<string, WtsTag>();
 export const fetchConversAppData = async (currentData: DashboardData, dateFilter: DateFilterState): Promise<DashboardData> => {
   try {
     const url = new URL(WTS_BASE_URL);
+    // Add timestamp to prevent caching
     url.searchParams.append('_t', new Date().getTime().toString());
 
+    // AbortController for Timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000);
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes max
 
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -477,17 +480,28 @@ export const fetchConversAppData = async (currentData: DashboardData, dateFilter
     
     clearTimeout(timeoutId);
 
-    if (!response.ok) throw new Error(`Status ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+        throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+    }
     
     const text = await response.text();
-    if (!text) return currentData;
+    if (!text || text.trim() === '') {
+        console.warn('API returned empty response');
+        return currentData;
+    }
 
     let rawJson;
-    try { rawJson = JSON.parse(text); } catch (e) { throw new Error("JSON Inválido"); }
+    try { 
+        rawJson = JSON.parse(text); 
+    } catch (e) { 
+        console.error("Failed to parse API response as JSON", text.substring(0, 100));
+        throw new Error("Resposta da API inválida (não é JSON)"); 
+    }
 
     let rawCards: any[] = [];
     let rawSteps: any[] = [];
 
+    // Flexible response structure handling
     if (Array.isArray(rawJson)) {
         rawCards = rawJson;
     } else if (rawJson.data && Array.isArray(rawJson.data)) {
@@ -579,6 +593,7 @@ export const fetchConversAppData = async (currentData: DashboardData, dateFilter
 
   } catch (error) {
     console.error('API Processing Error:', error);
+    // Propagate error to let UI know something went wrong
     throw error;
   }
 };

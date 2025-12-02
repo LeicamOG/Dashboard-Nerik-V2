@@ -162,7 +162,7 @@ function App() {
       });
     } catch (e: any) {
       console.error("Failed to load data", e);
-      const errorMessage = e instanceof Error ? e.message : "Erro desconhecido";
+      const errorMessage = e instanceof Error ? e.message : "Erro de conexão";
       setApiError(errorMessage);
     } finally {
       if (!isPolling) setLoading(false);
@@ -202,6 +202,7 @@ function App() {
     // If you want to persist roles, you'd need a similar localStorage logic for 'team_config'.
   };
 
+  // Only show full loading spinner if we have NO data to show
   if (loading && !data && !apiError) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex items-center justify-center transition-colors duration-300">
@@ -329,7 +330,7 @@ function App() {
                  ) : (
                    <span className="flex items-center gap-1 text-[9px] text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 bg-red-100 dark:bg-red-900/10 px-1.5 py-0.5 rounded print:hidden">
                       <WifiOff size={10} />
-                      ERROR
+                      OFFLINE
                    </span>
                  )}
               </div>
@@ -412,7 +413,7 @@ function App() {
                    <span className="font-bold">Erro na Integração:</span>
                 </div>
                 <span className="font-mono text-[10px] md:text-xs opacity-80 break-all">
-                  {apiError}
+                  {apiError} (Usando dados locais)
                 </span>
                 <button 
                   onClick={() => loadData(false)} 
